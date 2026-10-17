@@ -138,7 +138,7 @@ st.markdown("""
 <div class="header-bar">✚&nbsp;&nbsp;&nbsp;ZR Express Sync&nbsp;&nbsp;&nbsp;✚</div>
 <div class="main-card">
     <span class="store-icon">🏪</span>
-    <div class="store-title">Branded Store Orders</div>
+    <div class="store-title">Branded Store Orders Birtouta Hubs</div>
     <div class="store-sub">مزامنة الطلبيات التلقائية مع شركة ZR Express</div>
     <div class="divider"></div>
     <div class="status-text">النظام جاهز &nbsp;•&nbsp; اضغط لبدء المزامنة</div>
@@ -162,7 +162,7 @@ if clicked:
     buf = io.StringIO()
     sys.stdout = buf
     try:
-        bulk_upload_orders("Branded Store Orders Birtouta Hubs", "Orders")
+        bulk_upload_orders("Branded Store Orders", "Orders")
     except Exception as e:
         print(f"Error: {e}")
     finally:
