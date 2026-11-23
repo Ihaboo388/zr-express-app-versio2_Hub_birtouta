@@ -154,7 +154,7 @@ with col_btn:
 
 _, col_btn2, _ = st.columns([1, 2, 1])
 with col_btn2:
-    clicked_status = st.button("🔄   Update Orders Status", use_container_width=True)
+    clicked_status = st.button("🔄   Update Status", use_container_width=True)
 
 if clicked_status:
     result_area.markdown("""
