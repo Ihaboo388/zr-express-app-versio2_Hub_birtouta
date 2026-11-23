@@ -155,6 +155,12 @@ def sync_action_orders(sheet_name="Branded Store Orders", tab_name="Orders", app
     def cell(row, key):
         return str(row[c[key]]).strip() if len(row) > c[key] else ""
 
+    def extra(row, header):
+        if header not in headers:
+            return ""
+        i = headers.index(header)
+        return str(row[i]).strip() if len(row) > i else ""
+
     # IDs / trackings already used by other rows (so we never steal a parcel)
     used_by = {}
     action_rows = []
@@ -242,6 +248,10 @@ def sync_action_orders(sheet_name="Branded Store Orders", tab_name="Orders", app
 
         results.append({
             "Order": order,
+            "Name": extra(row, "full name"),
+            "Phone": extra(row, "phone"),
+            "Product": extra(row, "product sku"),
+            "Price": extra(row, "t.p"),
             "ZR status": _state(target or own) if (target or own) else "-",
             "New state": {"delivered": "Delivered", "return": "Return"}.get(action, "Action"),
             "Delivered at": when,
