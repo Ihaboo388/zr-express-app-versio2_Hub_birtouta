@@ -3,6 +3,7 @@ import sys, io, re
 import pandas as pd
 from bulk_import import bulk_upload_orders
 from status_sync import sync_action_orders
+from suivi import build_suivi, save_call_result, CALL_RESULTS
 
 st.set_page_config(page_title="ZR Sync", page_icon="✚", layout="centered")
 
@@ -155,6 +156,78 @@ with col_btn:
 _, col_btn2, _ = st.columns([1, 2, 1])
 with col_btn2:
     clicked_status = st.button("🔄   Update Status", use_container_width=True)
+
+_, col_btn3, _ = st.columns([1, 2, 1])
+with col_btn3:
+    clicked_suivi = st.button("📞   Suivi", use_container_width=True)
+
+if clicked_suivi:
+    with st.spinner("⏳ جاري تحميل الطلبيات التي تحتاج متابعة..."):
+        try:
+            st.session_state["suivi_cards"] = build_suivi("Branded Store Orders", "Orders")
+            st.session_state["suivi_error"] = None
+        except Exception as e:
+            st.session_state["suivi_cards"] = None
+            st.session_state["suivi_error"] = str(e)[:200]
+
+LEVELS = {
+    "day3":    ("#D32F2F", "#FFEBEE", "🔴 اليوم 3 — آخر يوم!"),
+    "late":    ("#212121", "#ECEFF1", "⚫ تجاوز 3 أيام — سيرجع"),
+    "day2":    ("#F57C00", "#FFF3E0", "🟠 اليوم 2"),
+    "day1":    ("#2E7D32", "#E8F5E9", "🟢 اليوم 1"),
+    "stuck":   ("#6A1B9A", "#F3E5F5", "⚠️ لم تُشحن بعد (أكثر من 3 أيام)"),
+    "transit": ("#546E7A", "#F5F7F8", "🚚 في الطريق"),
+    "missing": ("#9E9E9E", "#FAFAFA", "❓ غير موجودة في ZR"),
+}
+
+if st.session_state.get("suivi_error"):
+    st.error("❌ " + st.session_state["suivi_error"])
+
+cards = st.session_state.get("suivi_cards")
+if cards is not None:
+    counts = {k: sum(c["level"] == k for c in cards) for k in LEVELS}
+    st.markdown(f"""
+    <div class="fb-card fb-success" style="text-align:center">
+        <div class="fb-title">📞 متابعة الطلبيات ({len(cards)})</div>
+        <div class="fb-text">🔴 {counts['day3']} &nbsp; ⚫ {counts['late']} &nbsp; 🟠 {counts['day2']} &nbsp;
+        🟢 {counts['day1']} &nbsp; ⚠️ {counts['stuck']} &nbsp; 🚚 {counts['transit']}</div>
+    </div>""", unsafe_allow_html=True)
+
+    show_transit = st.toggle("إظهار الطلبيات التي لم تصل بعد للتوصيل 🚚", value=False)
+    for c in cards:
+        if c["level"] in ("transit", "missing") and not show_transit:
+            continue
+        border, bg, label = LEVELS[c["level"]]
+        mode = f"🏢 StopDesk — {c['hub'] or c['commune']}" if c["stopdesk"] else f"🏠 توصيل للمنزل — {c['commune']}"
+        sit = f"<div style='color:#B71C1C;font-weight:700'>📝 الليفرور: {c['situation_ar']}</div>" if c["situation_ar"] else ""
+        last = f"<div style='color:#455A64'>آخر متابعة: {c['suivi']}</div>" if c["suivi"] else ""
+        st.markdown(f"""
+        <div style="background:{bg};border-right:8px solid {border};border-radius:12px;
+                    padding:12px 14px;margin:12px 16px 4px;direction:rtl;text-align:right">
+            <div style="font-weight:900;color:{border};font-size:1.05rem">{label}</div>
+            <div style="font-weight:800;color:#1A3C2A">#{c['order']} — {c['name']}</div>
+            <div>📦 {c['product']} &nbsp;•&nbsp; 💰 {c['price']} دج</div>
+            <div>📍 {c['wilaya']} &nbsp;•&nbsp; {mode}</div>
+            <div>🚚 ZR: {c['state_ar']} &nbsp;•&nbsp; <span style="direction:ltr">{c['tracking']}</span></div>
+            {sit}{last}
+        </div>""", unsafe_allow_html=True)
+        a, b = st.columns(2)
+        with a:
+            st.link_button("📞 اتصال", c["tel"], use_container_width=True)
+        with b:
+            st.link_button("💬 واتساب", c["wa"], use_container_width=True)
+        r1, r2 = st.columns([3, 1])
+        with r1:
+            choice = st.selectbox("نتيجة الاتصال", CALL_RESULTS, key=f"res_{c['row']}",
+                                  label_visibility="collapsed")
+        with r2:
+            if st.button("💾", key=f"save_{c['row']}", use_container_width=True):
+                try:
+                    c["suivi"] = save_call_result(c["row"], choice, "Branded Store Orders", "Orders")
+                    st.toast(f"✅ تم الحفظ: #{c['order']}")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ لم يتم الحفظ: {str(e)[:120]}")
 
 if clicked_status:
     result_area.markdown("""
