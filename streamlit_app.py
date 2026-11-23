@@ -1,6 +1,8 @@
 import streamlit as st
 import sys, io, re
+import pandas as pd
 from bulk_import import bulk_upload_orders
+from status_sync import sync_action_orders
 
 st.set_page_config(page_title="ZR Sync", page_icon="✚", layout="centered")
 
@@ -14,15 +16,14 @@ header[data-testid="stHeader"], footer, #MainMenu,
 [data-testid="stDecoration"], [data-testid="stToolbar"],
 [data-testid="stStatusWidget"] { display: none !important; }
 
-html, body { height: 100vh !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; background-color: #F0F7F1 !important; }
+html, body { min-height: 100vh !important; margin: 0 !important; padding: 0 !important; background-color: #F0F7F1 !important; }
 
 [data-testid="stApp"],
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
 [data-testid="stMainBlockContainer"],
 [data-testid="block-container"] {
-    height: 100vh !important;
-    overflow: hidden !important;
+    min-height: 100vh !important;
     background-color: #F0F7F1 !important;
     padding: 0 !important;
     max-width: 520px !important;
@@ -97,7 +98,7 @@ div.stButton > button:active {
 [data-testid="stHorizontalBlock"] {
     gap: 0 !important;
     padding: 0 16px !important;
-    margin-top: 8vh !important;
+    margin-top: 3vh !important;
 }
 [data-testid="stColumn"]:first-child,
 [data-testid="stColumn"]:last-child { padding: 0 !important; }
@@ -150,6 +151,47 @@ result_area = st.empty()
 _, col_btn, _ = st.columns([1, 2, 1])
 with col_btn:
     clicked = st.button("🚀   Upload Orders", use_container_width=True)
+
+_, col_btn2, _ = st.columns([1, 2, 1])
+with col_btn2:
+    clicked_status = st.button("🔄   Update Orders Status", use_container_width=True)
+
+if clicked_status:
+    result_area.markdown("""
+    <div class="fb-card fb-loader">
+        <div class="spinner"></div>
+        <div class="fb-title">⏳ جاري فحص طلبيات Action في ZR Express...</div>
+        <div class="fb-text">نتحقق من كل طلبية: مستلمة، مرتجعة، أو ما زالت في الطريق.</div>
+    </div>""", unsafe_allow_html=True)
+    try:
+        res = sync_action_orders("Branded Store Orders", "Orders", apply=True)
+        s = res["summary"]
+        if not s.get("action"):
+            result_area.markdown("""
+            <div class="fb-card fb-success">
+                <div class="fb-title">✅ لا توجد طلبيات بحالة Action</div>
+                <div class="fb-text">كل الطلبيات محدثة.</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            result_area.markdown(f"""
+            <div class="fb-card fb-success">
+                <div class="fb-title">✅ اكتمل التحديث</div>
+                <div class="fb-count">{s.get('delivered', 0)} 📦 &nbsp; {s.get('return', 0)} ↩️</div>
+                <div class="fb-text">Delivered: {s.get('delivered', 0)} • Return: {s.get('return', 0)} •
+                ما زالت Action: {s.get('unchanged', 0)} • غير موجودة في ZR: {s.get('not_found', 0)}</div>
+            </div>""", unsafe_allow_html=True)
+            changed = [r for r in res["rows"] if r["New state"] != "Action"]
+            if changed:
+                st.markdown("**الطلبيات التي تم تحديثها:**")
+                st.dataframe(pd.DataFrame(changed), hide_index=True, use_container_width=True)
+            with st.expander("كل طلبيات Action وحالتها في ZR"):
+                st.dataframe(pd.DataFrame(res["rows"]), hide_index=True, use_container_width=True)
+    except Exception as e:
+        result_area.markdown(f"""
+        <div class="fb-card fb-error">
+            <div class="fb-title">❌ فشل التحديث</div>
+            <div class="fb-text">{str(e)[:200]}</div>
+        </div>""", unsafe_allow_html=True)
 
 if clicked:
     result_area.markdown("""
